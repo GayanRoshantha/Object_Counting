@@ -1,0 +1,17 @@
+import cv2
+
+video_path = 'road_traffic.mp4'  # Change to 0 for webcam
+cap = cv2.VideoCapture(video_path)
+
+while cap.isOpened():
+    ret, frame = cap.read()
+    if not ret:
+        break
+
+    cv2.imshow('Video Feed', frame)
+
+    if cv2.waitKey(30) & 0xFF == ord('q'):
+        break
+
+cap.release()
+cv2.destroyAllWindows()
