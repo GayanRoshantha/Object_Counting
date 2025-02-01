@@ -1,0 +1,93 @@
+# Counting packets moving on conveyor belt.
+# requred installations:
+#      Install scikit-image - pip install scikit-image
+#      Install filterpy - pip install numpy filterpy
+#      Download sort file and copy to directory - https://github.com/abewley/sort
+#
+#  Adjustments:    1. Region of Interest (ROI)
+#                  2. Y-position of the counting line
+#                  3. +/-20 line tollarance
+#                  4. Min object size
+
+
+import cv2
+import numpy as np  #cv2.imread() returns a NumPy array
+from sort import Sort  # Import the SORT tracking algorithm
+
+
+cap = cv2.VideoCapture('ConvCounter3.mp4')
+fgbg = cv2.createBackgroundSubtractorMOG2() #background subtraction.
+kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+
+# Initialize SORT tracker
+tracker = Sort()
+
+# Counting variables
+counted_ids = set()
+line_y = 250  # Y-position of the counting line
+
+car_count = 0
+
+# Step 2: Define the codec and create VideoWriter object
+fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # Codec for MP4 format
+out = cv2.VideoWriter('output.mp4', fourcc, 20.0, (800, 450))  # (filename, codec, FPS, resolution)
+
+while cap.isOpened():
+    ret, frame = cap.read()
+    if not ret:
+        break
+
+    frame = cv2.resize(frame, (800, 450))
+
+    roi = frame[100:400,100:600]    #Region of interest
+    cv2.rectangle(frame, (100, 100), (600, 400), (255, 0, 0), 2)  #Draw ROI rectangle
+
+    #cv2.imshow('Video Feed', frame)     #Normal Video stream
+
+    # Apply background subtraction and noise removal
+    fgmask = fgbg.apply(roi)                      #forground mask
+    fgmask = cv2.morphologyEx(fgmask, cv2.MORPH_OPEN, kernel)      #apply morphological operations to clean the foreground mask.
+    fgmask = cv2.morphologyEx(fgmask, cv2.MORPH_CLOSE, kernel)
+
+    # Find contours of moving objects
+    contours, _ = cv2.findContours(fgmask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    detections = []
+    for contour in contours:
+        if cv2.contourArea(contour) > 13000:  # Min object size
+            x, y, w, h = cv2.boundingRect(contour)
+            detections.append([x, y, x + w, y + h, 1])  # Format for SORT tracker
+
+    # Update tracker with new detections
+    # tracked_objects = tracker.update(np.array(detections))
+    if len(detections) > 0:
+        tracked_objects = tracker.update(np.array(detections))
+    else:
+        tracked_objects = tracker.update(np.empty((0, 5)))  # Send an empty 5-column array
+
+    # Draw tracking boxes
+    for obj in tracked_objects:
+        x1, y1, x2, y2, obj_id = map(int, obj)
+        cv2.rectangle(roi, (x1, y1), (x2, y2), (0, 255, 0), 2)
+        cv2.putText(roi, f'PACK : {obj_id-1}', (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 0, 0), 2)
+
+        # Count vehicle when it crosses the line
+        center_y = (y1 + y2) // 2
+        if line_y - 20 < center_y < line_y + 20 and obj_id not in counted_ids:    # +/-20 line tollarance
+            counted_ids.add(obj_id)
+
+    # Display count and counting line
+    cv2.putText(frame, f'Packet Count: {len(counted_ids)}', (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+    cv2.line(frame, (0, line_y), (800, line_y), (0, 0, 255), 2)  # Counting line
+
+
+    #cv2.imshow('Cleaned Mask', fgmask)
+
+    cv2.imshow('Object Counting', frame)
+    #out.write(frame)  #Save video file
+
+    if cv2.waitKey(30) & 0xFF == ord('q'):
+        break
+print('Total Counter ', len(counted_ids))
+cap.release()
+cv2.destroyAllWindows()
