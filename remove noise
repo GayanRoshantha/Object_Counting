@@ -1,0 +1,25 @@
+import cv2
+
+cap = cv2.VideoCapture('road_traffic.mp4' )
+fgbg = cv2.createBackgroundSubtractorMOG2() #background subtraction.
+kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+
+while cap.isOpened():
+    ret, frame = cap.read()
+    if not ret:
+        break
+
+
+    cv2.imshow('Video Feed', frame)     #Normal Video stream
+
+    fgmask = fgbg.apply(frame)                      #forground mask
+    cv2.imshow('Foreground Mask', fgmask)
+    fgmask = cv2.morphologyEx(fgmask, cv2.MORPH_OPEN, kernel)      #apply morphological operations to clean the foreground mask.
+    fgmask = cv2.morphologyEx(fgmask, cv2.MORPH_CLOSE, kernel)
+    cv2.imshow('Cleaned Mask', fgmask)
+
+    if cv2.waitKey(30) & 0xFF == ord('q'):
+        break
+
+cap.release()
+cv2.destroyAllWindows()
