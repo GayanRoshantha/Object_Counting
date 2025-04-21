@@ -1,2 +1,2 @@
 # Object_Counting
-Object Counting using python and open cv
+Object Counting on a conveyor belt using python and open cv
